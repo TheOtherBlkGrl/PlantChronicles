@@ -78,6 +78,14 @@
             color: var(--brown); font-style: italic; }
         .modal-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .modal-photo .photo-hint { pointer-events: none; }
+        .add-form label { display: block; font-weight: bold; color: var(--brown); margin: 0.9rem 0 0.3rem; font-size: 0.95rem; }
+        .add-form input, .add-form select, .add-form textarea {
+            width: 100%; box-sizing: border-box; padding: 10px 12px;
+            border: 2px solid var(--tan); border-radius: 8px;
+            font-size: 1rem; font-family: inherit; background: white; color: var(--text-dark);
+        }
+        .add-form textarea { min-height: 60px; resize: vertical; }
+        .add-form .save-btn { margin-top: 1.4rem; width: 100%; }
         .plant-info { padding: 1.8rem; display: flex; flex-direction: column; flex: 1; }
         .plant-title { margin: 0 0 12px 0; color: var(--brown); font-size: 1.6rem; }
         .tag {
@@ -169,6 +177,10 @@
     <script>
         const CATEGORIES = ["All", "Indoor", "Outdoor Potted", "Planter Boxes", "In Ground"];
         let activeCat = "All";
+
+        try {
+            (JSON.parse(localStorage.getItem("pc_custom_plants") || "[]")).forEach(c => PLANTS.push(c));
+        } catch (e) {}
 
         function renderFilters() {
             const wrap = document.getElementById("filters");
@@ -289,10 +301,60 @@
         document.getElementById("modal").onclick = (e) => {
             if (e.target.id === "modal") document.getElementById("modal").classList.remove("open");
         };
-        document.getElementById("addBtn").onclick = () => {
-            const tip = document.getElementById("addTip");
-            tip.style.display = tip.style.display === "none" ? "block" : "none";
-        };
+        function todayIso() {
+            const d = new Date();
+            return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+        }
+
+        function openAddModal() {
+            document.getElementById("mName").textContent = "New Plant";
+            document.getElementById("mBotanical").textContent = "";
+            const ptypeOpts = ["Houseplant", "Flowering shrub", "Tree", "Succulent", "Herb", "Vegetable", "Vine", "Ground cover", "Other"];
+            const catOpts = ["Indoor", "Outdoor Potted", "Planter Boxes", "In Ground"];
+            document.getElementById("mBody").innerHTML =
+                "<div class='add-form'>" +
+                    "<label>Plant name *</label><input id='fName' type='text' placeholder='e.g. Rosemary'>" +
+                    "<label>Botanical name</label><input id='fBot' type='text' placeholder='optional, e.g. Salvia rosmarinus'>" +
+                    "<label>Category *</label><select id='fCat'>" + catOpts.map(c => "<option>" + c + "</option>").join("") + "</select>" +
+                    "<label>Type</label><select id='fType'>" + ptypeOpts.map(t => "<option>" + t + "</option>").join("") + "</select>" +
+                    "<label>Soil</label><input id='fSoil' type='text' placeholder='e.g. well-draining potting mix'>" +
+                    "<label>Light</label><input id='fLight' type='text' placeholder='e.g. full sun, 6+ hours'>" +
+                    "<label>Water</label><input id='fWater' type='text' placeholder='e.g. deep soak once a week'>" +
+                    "<label>Fertilizer</label><input id='fFert' type='text' placeholder='optional'>" +
+                    "<label>Notes</label><textarea id='fNote' placeholder='anything you want to remember about it'></textarea>" +
+                    "<button class='btn save-btn' id='fSave'>Save Plant</button>" +
+                "</div>";
+            document.getElementById("modal").classList.add("open");
+            document.getElementById("fName").focus();
+            document.getElementById("fSave").onclick = () => {
+                const name = document.getElementById("fName").value.trim();
+                if (!name) { document.getElementById("fName").style.borderColor = "var(--orange)"; return; }
+                const v = id => document.getElementById(id).value.trim();
+                const plant = {
+                    id: "custom-" + Date.now(),
+                    name: name,
+                    botanical: v("fBot"),
+                    category: v("fCat"),
+                    ptype: v("fType"),
+                    soil: v("fSoil") || "Not set yet",
+                    light: v("fLight") || "Not set yet",
+                    water: v("fWater") || "Not set yet",
+                    fert: v("fFert") || "Not set yet",
+                    stages: [],
+                    notes: [[todayIso(), v("fNote") || "Added to the journal."]]
+                };
+                PLANTS.push(plant);
+                let custom = [];
+                try { custom = JSON.parse(localStorage.getItem("pc_custom_plants") || "[]"); } catch (e) {}
+                custom.push(plant);
+                try { localStorage.setItem("pc_custom_plants", JSON.stringify(custom)); }
+                catch (e) { alert("Could not save, this plant plus your photos are too large for this browser."); }
+                renderGrid();
+                openModal(plant);
+            };
+        }
+
+        document.getElementById("addBtn").onclick = openAddModal;
 
         renderFilters();
         renderGrid();
