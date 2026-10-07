@@ -67,7 +67,17 @@
             display: flex; align-items: center; justify-content: center;
             color: var(--brown); font-style: italic;
             border-bottom: 3px solid var(--orange);
+            cursor: pointer; position: relative; overflow: hidden;
         }
+        .plant-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .plant-img .photo-hint { font-size: 0.95rem; opacity: 0.85; pointer-events: none; }
+        .plant-img:hover .photo-hint { text-decoration: underline; }
+        .modal-photo { width: 100%; height: 260px; border-radius: 10px; overflow: hidden;
+            background: var(--tan); cursor: pointer; position: relative; margin-bottom: 1.4rem;
+            display: flex; align-items: center; justify-content: center;
+            color: var(--brown); font-style: italic; }
+        .modal-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .modal-photo .photo-hint { pointer-events: none; }
         .plant-info { padding: 1.8rem; display: flex; flex-direction: column; flex: 1; }
         .plant-title { margin: 0 0 12px 0; color: var(--brown); font-size: 1.6rem; }
         .tag {
@@ -184,7 +194,7 @@
                 const card = document.createElement("div");
                 card.className = "plant-card";
                 card.innerHTML =
-                    "<div class='plant-img'>[ 📸 Photo Placeholder ]</div>" +
+                    "<div class='plant-img' data-pid='" + p.id + "'>" + photoHtml(p.id) + "</div>" +
                     "<div class='plant-info'>" +
                         "<h3 class='plant-title'>" + p.name + "</h3>" +
                         "<span class='tag'>" + p.ptype + "</span>" +
@@ -197,6 +207,7 @@
                         "<button class='view-btn'>View Full Details &amp; Log</button>" +
                     "</div>";
                 card.querySelector(".view-btn").onclick = () => openModal(p);
+                card.querySelector(".plant-img").onclick = () => pickPhoto(p.id);
                 grid.appendChild(card);
             });
         }
@@ -210,6 +221,7 @@
             document.getElementById("mName").textContent = p.name;
             document.getElementById("mBotanical").textContent = p.botanical || "";
             const care =
+                "<div class='modal-photo' data-pid='" + p.id + "'>" + photoHtml(p.id) + "</div>" +
                 "<div class='care-block'><h4>Care</h4>" +
                     "<div class='care-row'>🪴 <strong>Soil:</strong> " + p.soil + "</div>" +
                     "<div class='care-row'>☀️ <strong>Light:</strong> " + p.light + "</div>" +
@@ -225,8 +237,53 @@
                         .map(n => "<li><span class='note-date'>" + fmtDate(n[0]) + "</span>" + n[1] + "</li>").join("") +
                 "</ul></div>";
             document.getElementById("mBody").innerHTML = care;
+            document.querySelector(".modal-photo").onclick = () => pickPhoto(p.id);
             document.getElementById("modal").classList.add("open");
         }
+
+        let photos = {};
+        try { photos = JSON.parse(localStorage.getItem("pc_photos") || "{}"); } catch (e) { photos = {}; }
+        function savePhotos() {
+            try { localStorage.setItem("pc_photos", JSON.stringify(photos)); }
+            catch (e) { alert("This photo is too large to save. Try a smaller one."); }
+        }
+        function photoHtml(pid) {
+            return photos[pid]
+                ? "<img src='" + photos[pid] + "' alt='plant photo'>"
+                : "<span class='photo-hint'>[ 📸 tap to add a photo ]</span>";
+        }
+
+        const fileInput = document.createElement("input");
+        fileInput.type = "file";
+        fileInput.accept = "image/*";
+        fileInput.style.display = "none";
+        document.body.appendChild(fileInput);
+        let pickingPid = null;
+        fileInput.onchange = () => {
+            const f = fileInput.files[0];
+            if (!f || !pickingPid) return;
+            const reader = new FileReader();
+            reader.onload = () => {
+                const img = new Image();
+                img.onload = () => {
+                    const max = 900;
+                    const scale = Math.min(1, max / Math.max(img.width, img.height));
+                    const c = document.createElement("canvas");
+                    c.width = Math.round(img.width * scale);
+                    c.height = Math.round(img.height * scale);
+                    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+                    photos[pickingPid] = c.toDataURL("image/jpeg", 0.75);
+                    savePhotos();
+                    renderGrid();
+                    const mp = document.querySelector(".modal-photo[data-pid='" + pickingPid + "']");
+                    if (mp) mp.innerHTML = photoHtml(pickingPid);
+                };
+                img.src = reader.result;
+            };
+            reader.readAsDataURL(f);
+            fileInput.value = "";
+        };
+        function pickPhoto(pid) { pickingPid = pid; fileInput.click(); }
 
         document.getElementById("closeX").onclick = () => document.getElementById("modal").classList.remove("open");
         document.getElementById("modal").onclick = (e) => {
